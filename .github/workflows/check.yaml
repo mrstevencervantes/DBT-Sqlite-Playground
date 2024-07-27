@@ -1,0 +1,53 @@
+name: Python DBT-Sqlite Check
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
+        
+    steps:
+        - uses: actions/checkout@v4
+
+        - name: Set up Python
+          uses: actions/setup-python@v5
+          with:
+            python-version: ${{ matrix.python-version }}
+
+        - name: Install distutils
+          run: |
+            sudo apt-get update
+            sudo apt-get install python3-distutils
+
+        - name: Cache dependencies
+          uses: actions/cache@v3
+          with:
+            path: ~/.cache/pip
+            key: ${{ runner.os }}-python-${{ matrix.python-version }}-pip-cache
+            restore-keys: |
+              ${{ runner.os }}-python-${{ matrix.python-version }}-pip-cache
+              ${{ runner.os }}-python-${{ matrix.python-version }}
+              ${{ runner.os }}-pip-cache
+              
+        - name: Install dependencies
+          run: |
+            python3 -m pip install --upgrade pip
+            if [ -f dbt/requirements.txt ]; then pip install -r dbt/requirements.txt; fi
+            . .devcontainer/.env.devcontainer
+
+        - name: Run dbt test
+          run: |
+            export DBT_PROFILES_DIR=$(pwd)/dbt/
+            echo $DBT_PROFILES_DIR
+            cd dbt/
+            dbt init playground -s
+            cd playground/
+            dbt debug -t dev
